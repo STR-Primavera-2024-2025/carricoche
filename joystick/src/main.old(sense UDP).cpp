@@ -106,7 +106,7 @@ WiFiServer server(80);
 WiFiUDP Udp;  
 WiFiClient client;
 String ur3Command="";
-// IPAddress ur3(192,168,1,100);//UR3 IP address (left robot)
+IPAddress ur3(192,168,1,100);//UR3 IP address (left robot)
 const unsigned int ur3PORT=30003;
 const unsigned int gripperPORT=41414;
 
@@ -154,9 +154,9 @@ void TaskReadUdp(void);
 void TaskSendUdp(void);
 
 Thread threadSendUdp(osPriorityHigh);
-//Thread threadReadUdp(osPriorityHigh);
+Thread threadReadUdp(osPriorityHigh);
 Thread threadJoystick(osPriorityHigh);
-//Thread threadDisplay(osPriorityHigh);
+Thread threadDisplay(osPriorityHigh);
 Thread threadCalcDir(osPriorityHigh);
 Thread threadTFT(osPriorityHigh);
 
@@ -166,35 +166,77 @@ void setup()
   Serial.println("Init...");
   
   ledInit();
-  // wifiInitAccessPoint(); //
-  wifiInitWPA();
+  wifiInitAccessPoint(); // wifiInitWPA();
   Udp.begin(8888);
   
   tftInit();
   motorInit();
-  //laserInit();
-  //capacitiveInit();
-  //imuInit();
-  //gpsInit();
+  laserInit();
+  capacitiveInit();
+  imuInit();
+  gpsInit();
   displayInit();
   joystickInit();
  
   threadSendUdp.start(TaskSendUdp); // periodica
-  //threadReadUdp.start(TaskReadUdp); // periodica
+  threadReadUdp.start(TaskReadUdp); // periodica
   threadJoystick.start(joystickGetData); //periodica
-  //threadDisplay.start(displayUpdate); //periodic
+  threadDisplay.start(displayUpdate); //periodic
   threadCalcDir.start(calcDirection);
   threadTFT.start(tftUpdate);
   
+  // tft.setTextColor(0x0000,0xffff);
+  // tft.setCursor(5, 100);  
+  // tft.print("threadsinit");
+  
 }
 
-void loop() {}
+void loop() 
+{
+  //ledUpdate();
+  //if (laserState==LOW)
+  //{
+  //  laserON();
+  //}else{
+  //  laserOFF();
+  //}   
+  //capacitiveUpdate();
+  //if (capacitiveValue==HIGH)
+  //{
+  //  motorON();
+  //}else{
+  //  motorOFF();
+  //}
+  //imuGetData();
+  //gpsGetData();
+  //displayUpdate();
+  //tftUpdate();
+  //supervisionUpdate();
+  // joystickGetData();
+  // delay(200);
+}
 
+char message[50]="Udp from giga to esp32...";
 void TaskSendUdp(void){
   for(;;){
+    // IPAddress remoteIP = Udp.remoteIP();
     unsigned int udpRemotePort = 8888;//Udp.remotePort();
+
+    // Udp.beginPacket(remoteIP, udpRemotePort);
+    time_t seconds = time(NULL);
     Udp.beginPacket(ipRemote, 8888);
+    // Udp.print("t=");
+    // Udp.print(seconds);
+    // Udp.print("s, ");
+    
+    // Udp.println(message);
+
     Udp.println(dir);
+    // Udp.println(normx+100);
+    // Udp.println(".");
+    // Udp.println(normy+100);
+    // Udp.println(dir);
+
     Udp.endPacket();
   ThisThread::sleep_for(50ms);
   }
@@ -202,11 +244,19 @@ void TaskSendUdp(void){
 
 void TaskReadUdp(void){
   for(;;){
+
     int udpBufferSize = Udp.parsePacket();
+    
     if (udpBufferSize){
       int len = Udp.read(udpBufferRead, 127); //255
       if (len > 0) udpBufferRead[len] = 0;
+      // Serial.println(udpBufferRead);
+
+      // tft.setTextColor(0x0000,0xffff);
+      // tft.setCursor(5, 70);
+      // tft.print(udpBufferRead);
     }
+
     ThisThread::sleep_for(200ms);
   }
 }
@@ -240,7 +290,7 @@ void wifiInitAccessPoint(void)
   Serial.println(ssid);
   // Create open network. Change this line if you want to create an WEP network:
   int status = WL_IDLE_STATUS;
-  status = WiFi.begin(ssid, pass); //wifi.beginAP(const char* ssid, const char* passphrase, uint8_t channel = DEFAULT_AP_CHANNEL);
+  status = WiFi.beginAP(ssid, pass); //wifi.beginAP(const char* ssid, const char* passphrase, uint8_t channel = DEFAULT_AP_CHANNEL);
   if (status != WL_AP_LISTENING) 
   {
     Serial.println("Creating access point failed");
@@ -401,10 +451,10 @@ void tftUpdate(void)
     tft.print(" ");
 
 
-    // tft.setTextColor(0x0000,0xffff);
-    // tft.setCursor(5, 60);  
-    // tft.print("Deg = ");
-    // tft.print(angle_deg);
+    tft.setTextColor(0x0000,0xffff);
+    tft.setCursor(5, 60);  
+    tft.print("Deg = ");
+    tft.print(angle_deg);
 
     tft.setTextColor(0x0000,0xffff);
     tft.setCursor(5, 120);  
@@ -426,27 +476,27 @@ void tftUpdate(void)
     tft.print(normy);
     tft.print("   ");
 
-    // tft.setTextColor(0x0000,0xffff);
-    // tft.setCursor(5, 80);  
-    // tft.print("z=");
-    // tft.print(z);
-    // tft.print("   ");
+    tft.setTextColor(0x0000,0xffff);
+    tft.setCursor(5, 80);  
+    tft.print("z=");
+    tft.print(z);
+    tft.print("   ");
 
-    // tft.setTextColor(0x0000,0xffff);
-    // tft.setCursor(5, 100);  
-    // tft.print("PitchRef=");
+    tft.setTextColor(0x0000,0xffff);
+    tft.setCursor(5, 100);  
+    tft.print("PitchRef=");
     
-    // int msg = atoi(udpBufferRead);;
-    // float pitchRef = ((int)(msg/1000))/100.0;
+    int msg = atoi(udpBufferRead);;
+    float pitchRef = ((int)(msg/1000))/100.0;
 
-    // int pitchRefSign = pitchRef/1000;
+    int pitchRefSign = pitchRef/1000;
 
-    // pitchRef = pitchRef - (pitchRefSign*1000);
-    // if (pitchRefSign == 8) {
-    //   pitchRef = pitchRef*(-1.0);
-    // }
-    // tft.print(pitchRef);
-    // tft.print("   ");
+    pitchRef = pitchRef - (pitchRefSign*1000);
+    if (pitchRefSign == 8) {
+      pitchRef = pitchRef*(-1.0);
+    }
+    tft.print(pitchRef);
+    tft.print("   ");
 
     if (ButtonUpState==LOW)
     {
@@ -765,22 +815,35 @@ void joystickGetData(void)
       yaw=yaw-1.0;
     }    
 
+    //memories
     xLast=x;
     yLast=y;
 
+    //int normx = JoystickAnalogX;
+    //int normy = JoystickAnalogY;
     normx = (((double)JoystickAnalogX-512)/512)*100;
     normy = (((double)JoystickAnalogY-512)/512)*100;
 
-    // angle_deg = atan2(normy/100.0, normx/100.0) * (180.0 / PI);
-    // Serial.println(angle_deg);
+    // tft.setTextColor(0x0000,0xffff);
+    // tft.setCursor(5, 130);  
+    // tft.print("y=");
+    // if (normy<0) {
+    //   tft.print("-");
+    //   normy = normy*(-1);
+    // }
+    // tft.print(normy);
+    // tft.print("   ");
 
-    // Serial.print("x = ");
-    // Serial.println(normx);
-    // Serial.print("y = ");
-    // Serial.println(normy);
-    // Serial.println("------------");
+    angle_deg = atan2(normy/100.0, normx/100.0) * (180.0 / PI);
+    Serial.println(angle_deg);
 
-    ThisThread::sleep_for(100ms);
+    Serial.print("x = ");
+    Serial.println(normx);
+    Serial.print("y = ");
+    Serial.println(normy);
+    Serial.println("------------");
+
+    ThisThread::sleep_for(200ms);
   }
 }
 
@@ -801,11 +864,11 @@ void calcDirection(void)
     if (JoystickYDownState & JoystickXRightState) dir = 4;
     if (JoystickYDownState & JoystickXLeftState ) dir = 6;
     if (JoystickYUpState   & JoystickXLeftState ) dir = 8;
-    if (ButtonLeftState==LOW)                     dir = 9;
-    if (ButtonRightState==LOW)                    dir = 10;
+    if (ButtonUpState==LOW)                       dir = 9;
+    if (ButtonDownState==LOW)                     dir = 10;
     
-    // Serial.print("Direction: ");
-    // Serial.println(dir);
+    Serial.print("Direction: ");
+    Serial.println(dir);
 
     ThisThread::sleep_for(200ms);
   }
