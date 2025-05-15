@@ -17,8 +17,8 @@ char pass[] = "Grup4Pass";   //Access point
 // char pass[] = "wlan_str"; // your WPA network password (use for WPA, or use as key for WEP)
 int status = WL_IDLE_STATUS;     // the WiFi radio's status
 // IPAddress ip(192, 168, 1, 111); //static ip is not working!
-IPAddress ipRemote=IPAddress(192, 168, 1, 112);//fixed ip not working...!!!
-IPAddress ipLocal=IPAddress(192, 168, 1, 111);//fixed ip not working...!!!
+IPAddress ipRemote=IPAddress(192, 168, 1, 111);//fixed ip not working...!!!
+IPAddress ipLocal=IPAddress(192, 168, 1, 112);//fixed ip not working...!!!
 WiFiServer server(80);
 WiFiUDP Udp;  
 WiFiClient client;
@@ -29,7 +29,7 @@ const unsigned int gripperPORT=41414;
 
 
 //Global Variables
-int dir = 7;
+int dir = 0;
 char udpBufferRead[256];
 
 //Threads
@@ -41,12 +41,14 @@ Thread threadReadUdp(osPriorityHigh);
 void moveMotors();
 void TaskReadUdp();
 void TaskSendUdp();
+void wifiInit();
 
 void setup() {
-  
-  Serial.begin(12500);
-
+  Serial.begin(115200);
+  wifiInit(); // wifiInitWPA();
+  Udp.begin(8888);
   threadMotors.start(moveMotors);
+  threadReadUdp.start(TaskReadUdp);
   /*
   m.motor(1,FORWARD,255);
   m.motor(4,FORWARD,255);  
@@ -69,7 +71,6 @@ Rodes
 2 - back right
 1 - back left
 */
-
 
 void moveMotors() {
   for (;;) {     
@@ -142,16 +143,14 @@ void moveMotors() {
         m.motor(4,BRAKE,150);
         break;  
     }
-    dir++;
-    if (dir == 11) dir = 0;
-    ThisThread::sleep_for(2000ms);
+    ThisThread::sleep_for(50ms);
   }
 }
 
 char message[50]="Udp from giga...";
 void TaskSendUdp(void) {
   for(;;){
-    // IPAddress remoteIP = Udp.remoteIP();
+  // IPAddress remoteIP = Udp.remoteIP();
   //   unsigned int udpRemotePort = 8888;//Udp.remotePort();
 
   //   // Udp.beginPacket(remoteIP, udpRemotePort);
@@ -176,19 +175,77 @@ void TaskSendUdp(void) {
 
 void TaskReadUdp(void){
   for(;;){
-
     int udpBufferSize = Udp.parsePacket();
-    
     if (udpBufferSize){
       int len = Udp.read(udpBufferRead, 127); //255
       if (len > 0) udpBufferRead[len] = 0;
-      // Serial.println(udpBufferRead);
-
-      // tft.setTextColor(0x0000,0xffff);
-      // tft.setCursor(5, 70);
-      // tft.print(udpBufferRead);
+      Serial.println(udpBufferRead);
+      dir = atoi(udpBufferRead);
     }
-
-    ThisThread::sleep_for(200ms);
+    ThisThread::sleep_for(50ms);
   }
+}
+
+void wifiInit(void)
+{
+  // check for the WiFi module:
+  if (WiFi.status() == WL_NO_MODULE) 
+  {
+    Serial.println("Communication with WiFi module failed!");
+  }
+  // WiFi.config(ip);
+  WiFi.config(ipLocal);
+  // print the network name (SSID);
+  Serial.print("Creating access point named: ");
+  Serial.println(ssid);
+  // Create open network. Change this line if you want to create an WEP network:
+  int status = WL_IDLE_STATUS;
+  status = WiFi.beginAP(ssid, pass); //wifi.beginAP(const char* ssid, const char* passphrase, uint8_t channel = DEFAULT_AP_CHANNEL);
+  if (status != WL_AP_LISTENING) 
+  {
+    Serial.println("Creating access point failed");
+  }
+    // print the SSID of the network you're attached to:
+  Serial.print("SSID: ");
+  Serial.println(WiFi.SSID());
+
+  // print your board's IP address:
+  IPAddress ip = WiFi.localIP();
+  Serial.print("IP Address: ");
+  Serial.println(ip);
+
+  // print the received signal strength:
+  long rssi = WiFi.RSSI();
+  Serial.print("signal strength (RSSI):");
+  Serial.print(rssi);
+  Serial.println(" dBm");
+    // print the SSID of the network you're attached to:
+  Serial.print("SSID: ");
+  Serial.println(WiFi.SSID());
+
+  // print the encryption type:
+  byte encryption = WiFi.encryptionType();
+  Serial.print("Encryption Type:");
+  Serial.println(encryption, HEX);
+  Serial.println();
+  // print your board's IP address:
+  ip = WiFi.localIP();
+  Serial.print("IP Address: ");
+  Serial.println(ip);
+  Serial.println(ip);
+
+  // print your MAC address:
+  byte mac[6];
+  WiFi.macAddress(mac);
+  Serial.print("MAC address: ");
+    for (int i = 5; i >= 0; i--) {
+    if (mac[i] < 16) {
+      Serial.print("0");
+    }
+    Serial.print(mac[i], HEX);
+    if (i > 0) {
+      Serial.print(":");
+    }
+  }
+  Serial.println();
 }
