@@ -3,10 +3,13 @@
 #include "rtos.h"
 #include "WiFi.h" 
 #include "MotorDriver.h"
+#include <CAN.h>
 
 using namespace mbed;
 using namespace rtos;
 using namespace std::chrono;
+
+#define STOP 0
 
 MotorDriver m;
 
@@ -37,6 +40,15 @@ Thread threadMotors(osPriorityHigh), threadReadSerial(osPriorityHigh), threadScr
 Thread threadSendUdp(osPriorityHigh);
 Thread threadReadUdp(osPriorityHigh);
 
+Thread canRxThread(osPriorityHigh7);//, DEFAULT_STACK_SIZE
+void canRxThreadCode(void);
+
+Thread canTxThread(osPriorityHigh7);//, DEFAULT_STACK_SIZE
+void canTxThreadCode(void);
+
+mbed::CAN can(PB_5, PB_13);
+mbed::CANMessage msgRx;
+
 //Functions
 void moveMotors();
 void TaskReadUdp();
@@ -45,6 +57,10 @@ void TaskSendUdp();
 void setup() {
   
   Serial.begin(12500);
+
+  can.frequency(500000);
+  canRxThread.start(canRxThreadCode);
+  canTxThread.start(canTxThreadCode);
 
   threadMotors.start(moveMotors);
   /*
@@ -69,6 +85,74 @@ Rodes
 2 - back right
 1 - back left
 */
+
+
+
+//TODO: move to external pin interrupt driven thread
+void canRxThreadCode(void) 
+{
+  const unsigned int TcanRxThread=50; //periodicity of the red led thread in ms
+  uint64_t nextWakeTime = TcanRxThread;
+
+  for (;;) 
+  {  // Repeat forever    
+    if (can.read(msgRx))
+    {      
+      Serial.print("CAN Rx (thread) Id=");
+      Serial.print(msgRx.id);
+      Serial.print("--> ");
+      for(byte i = 0; i<msgRx.len; i++)
+      {
+          Serial.print(msgRx.data[i]); 
+          Serial.print(" ");
+      }
+      Serial.println();   
+    }     
+
+    nextWakeTime=TcanRxThread-(get_ms_count()%TcanRxThread);
+    ThisThread::sleep_for(nextWakeTime);
+  }
+}
+
+void canTxThreadCode(void) 
+{
+  const unsigned int TcanTxThread=1000; //periodicity of the red led thread in ms
+  uint64_t nextWakeTime = TcanTxThread;
+  
+  long unsigned int txId=55;
+  unsigned char len = 8;
+  unsigned char txBuf[8]={55,55,55,55,55,55,55,55};
+  // mbed::CANMessage(txId, txBuf, len) msgTx;
+  mbed::CANMessage msgTx;
+
+  for (;;) 
+  {  // Repeat forever    
+    msgTx.id=55;
+    msgTx.len=8;
+    msgTx.data[0]=55;
+    msgTx.data[1]=55;
+    msgTx.data[2]=55;
+    msgTx.data[3]=55;
+    msgTx.data[4]=55;
+    msgTx.data[5]=55;
+    msgTx.data[6]=55;
+    msgTx.data[7]=msgTx.data[7]+1;
+    can.write(msgTx);
+    Serial.print("CAN Tx (thread)");
+    Serial.print(" Id=");
+    Serial.print(msgTx.id);
+    Serial.print("--> ");
+    for(byte i = 0; i<msgTx.len; i++)
+      {
+          Serial.print(msgTx.data[i]); 
+          Serial.print(" ");
+      }        
+      Serial.println();
+
+    nextWakeTime=TcanTxThread-(get_ms_count()%TcanTxThread);
+    ThisThread::sleep_for(nextWakeTime);
+  }
+}
 
 
 void moveMotors() {
